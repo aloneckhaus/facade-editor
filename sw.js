@@ -1,6 +1,6 @@
 /* Facade editor service worker: precache app shell + DWG engine so it works offline */
-const CACHE = 'facade-editor-v2';
-const FILES = ['./', './index.html', './app.js', './geom.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png',
+const CACHE = 'facade-editor-v3';
+const FILES = ['./', './index.html', './simple.js', './advanced.html', './app.js', './geom.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png',
   './lib/dxf-parser.js', './lib/libredwg-glue.js', './lib/libredwg-web.umd.js', './lib/libredwg-web.wasm'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
