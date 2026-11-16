@@ -1,4 +1,4 @@
-/* Facade editor v0.2 – simple: floor/wall grid + windows only. World units = metres, y up. */
+/* Facade editor v0.3 – simple: floor/wall grid + windows only (+ Klil Bauhaus 5600 library). World units = metres, y up. */
 (function () {
 'use strict';
 var $ = function (id) { return document.getElementById(id); };
@@ -120,8 +120,30 @@ function label(c, w, X, Y, dpr) {
   c.font = (12 * dpr) + 'px Heebo, Arial'; var tw = c.measureText(t).width, x = X(absX(w)), y = Y(absY(w) + w.h) - 10 * dpr;
   c.fillStyle = 'rgba(44,42,39,.88)'; c.fillRect(x - 4 * dpr, y - 14 * dpr, tw + 8 * dpr, 18 * dpr); c.fillStyle = '#fff'; c.fillText(t, x, y);
 }
+function kopts(w) { var t = T(w.t) || {}; return { split: w.split != null ? w.split : t.split, mir: !!w.mir, glass: w.glass || t.glass }; }
+function kgeom(w) { var t = T(w.t); return t && t.klil && window.KlilGeom ? KlilGeom.geom(t.klil, w.w * 1000, w.h * 1000, kopts(w)) : null; }
+function drawKlil(c, w, g, x, y, s, dpr, bad, color) {
+  var k = s / 1000; // px per mm
+  function R(a) { return [x + a[0] * k, y + (g.H - a[3]) * k, (a[2] - a[0]) * k, (a[3] - a[1]) * k]; }
+  var lw = Math.max(0.6 * dpr, Math.min(1.4 * dpr, 0.004 * s));
+  c.fillStyle = '#d9dcdf'; c.fillRect(x, y, g.W * k, g.H * k); // aluminium
+  c.strokeStyle = '#3d4247'; c.lineWidth = lw;
+  g.bars.forEach(function (b) { var r = R(b); c.strokeRect(r[0], r[1], r[2], r[3]); });
+  g.sashes.forEach(function (sh) { var r = R(sh.sr); c.fillStyle = '#cfd3d7'; c.fillRect(r[0], r[1], r[2], r[3]); c.strokeRect(r[0], r[1], r[2], r[3]); });
+  g.sashes.concat(g.fixed).forEach(function (p) { if (p.dl[2] <= p.dl[0] || p.dl[3] <= p.dl[1]) return; var r = R(p.dl); c.fillStyle = '#e4f1f8'; c.fillRect(r[0], r[1], r[2], r[3]); c.strokeRect(r[0], r[1], r[2], r[3]); });
+  if (g.kt.kind === 'door') { var tr = R([0, 0, g.W, Math.min(12, g.H)]); c.fillStyle = '#9aa0a6'; c.fillRect(tr[0], tr[1], tr[2], tr[3]); }
+  c.strokeStyle = '#5d646b';
+  g.sym.forEach(function (sy) { c.setLineDash(sy.d ? [5 * dpr, 4 * dpr] : []); c.beginPath(); for (var i = 0; i < sy.p.length; i += 2) { var px = x + sy.p[i] * k, py = y + (g.H - sy.p[i + 1]) * k; if (i) c.lineTo(px, py); else c.moveTo(px, py); } c.stroke(); });
+  c.setLineDash([]);
+  var warn = g.warn.length;
+  c.strokeStyle = bad ? '#ff0000' : warn ? '#e8600c' : '#1f2326'; c.lineWidth = Math.max(1, Math.min(2.2 * dpr, 0.05 * s)); if (bad || warn) c.setLineDash([4 * dpr, 3 * dpr]);
+  c.strokeRect(x, y, g.W * k, g.H * k); c.setLineDash([]);
+  if (w.t && g.W * k > 26 * dpr && g.H * k > 16 * dpr) { var fs = Math.min(13 * dpr, g.H * k * 0.18); c.font = '600 ' + fs + 'px Heebo, Arial'; c.textAlign = 'center'; c.textBaseline = 'top'; c.fillStyle = warn ? '#c4500a' : color;
+    c.fillText(w.t + (warn ? ' ⚠' : ''), x + g.W * k / 2, y + 3 * dpr); c.textAlign = 'start'; c.textBaseline = 'alphabetic'; }
+}
 function drawWin(c, w, X, Y, s, dpr) {
   var t = T(w.t) || { color: '#777' }, x = X(absX(w)), y = Y(absY(w) + w.h), ww = w.w * s, hh = w.h * s, bad = w.dx < -1e-6 || w.dx + w.w > span(w.b) + 1e-6 || w.sill + w.h > fh(w.f) + 1e-6;
+  var kg = kgeom(w); if (kg) return drawKlil(c, w, kg, x, y, s, dpr, bad, t.color);
   c.fillStyle = 'rgba(255,255,255,0.95)'; c.fillRect(x, y, ww, hh);
   c.fillStyle = hexA(t.color, 0.14); c.fillRect(x, y, ww, hh);
   c.strokeStyle = bad ? '#ff0000' : t.color; c.lineWidth = Math.max(1, Math.min(2.4 * dpr, 0.05 * s)); if (bad) c.setLineDash([4 * dpr, 3 * dpr]); c.strokeRect(x, y, ww, hh); c.setLineDash([]);
@@ -293,7 +315,7 @@ function applyGrid() {
 function renderTypes() {
   var h = '<tr><th></th><th>סוג</th><th>רוחב</th><th>גובה</th><th>אדן</th><th></th></tr>';
   S.types.forEach(function (t, i) {
-    h += '<tr data-i="' + i + '"><td><input type="color" data-f="color" value="' + t.color + '"></td><td><button class="tbtn' + (S.place === t.id ? ' on' : '') + '" data-place="' + esc(t.id) + '" title="לחץ ואז לחץ בגריד"><span class="sw" style="background:' + t.color + '"></span>' + esc(t.id) + '</button></td>' +
+    h += '<tr data-i="' + i + '"><td><input type="color" data-f="color" value="' + t.color + '"></td><td><button class="tbtn' + (S.place === t.id ? ' on' : '') + '" data-place="' + esc(t.id) + '" title="' + (t.name ? esc(t.name) : 'לחץ ואז לחץ בגריד') + '"><span class="sw" style="background:' + t.color + '"></span>' + esc(t.id) + '</button>' + (t.klil ? '<div class="mut kn">' + esc(t.name) + '</div>' : '') + '</td>' +
       '<td><input type="number" step="5" data-f="w" value="' + Math.round(t.w * 100) + '"></td><td><input type="number" step="5" data-f="h" value="' + Math.round(t.h * 100) + '"></td><td><input type="number" step="5" data-f="sill" value="' + Math.round(t.sill * 100) + '"></td><td><button class="x" data-del="' + i + '" title="מחיקה">✕</button></td></tr>';
   });
   if (h === lastTypesHtml) return; // don't replace the DOM needlessly (would swallow clicks after an input blur)
@@ -310,6 +332,24 @@ $('types').addEventListener('change', function (e) {
     S.win.forEach(function (w) { if (w.t !== t.id) return; if (Math.abs(w[f] - old) < 1e-6) { if (f === 'w') w.dx += (old - nv) / 2; w[f] = nv; } }); }
   refresh();
 });
+// ---------------- Klil Bauhaus 5600 library
+function renderKlilLib() {
+  var el = $('klilLib'); if (!el || !window.KlilGeom) return; var K = KlilGeom.data, h = '';
+  K.types.forEach(function (kt) { h += '<button class="kl" data-klil="' + kt.id + '" title="' + esc(kt.name) + ' · זיגוג ' + kt.glass + ' מ״מ · קליל גיליון ' + kt.sheet + '"><canvas width="44" height="56"></canvas><span>' + esc(kt.name) + '<br><span class="mut">' + (kt.kind === 'door' ? 'דלת' : kt.kind === 'fixed' ? 'קבוע' : 'חלון') + ' · זיגוג ' + kt.glass + ' מ״מ</span></span></button>'; });
+  el.innerHTML = h;
+  el.querySelectorAll('[data-klil]').forEach(function (b) { var kt = KlilGeom.type(b.getAttribute('data-klil')), c2 = b.querySelector('canvas').getContext('2d'), d = kt.defaults;
+    var g = KlilGeom.geom(kt.id, d.w, d.h, {}), sc = Math.min(40 / d.w, 52 / d.h) * 1000, x = (44 - d.w * sc / 1000) / 2, y = (56 - d.h * sc / 1000) / 2;
+    drawKlil(c2, { t: '' }, g, x, y, sc, 0.5, false, '#000'); });
+}
+function addKlilType(kid) {
+  var kt = KlilGeom.type(kid); if (!kt) return; var t = null;
+  S.types.forEach(function (o) { if (o.klil === kid) t = o; });
+  if (!t) { push(); var id = kt.id; while (T(id)) id += "'"; var d = kt.defaults;
+    t = { id: id, name: kt.name, klil: kid, w: d.w / 1000, h: d.h / 1000, sill: d.sill / 1000, color: '#3d4a57', glass: kt.glass };
+    if (d.split) t.split = d.split; S.types.push(t); S.gen.pct[id] = 0; }
+  S.place = t.id; refresh(); toast('לחץ בתא בגריד כדי להוסיף ' + t.id + ' – ' + kt.name + ' · Esc לסיום');
+}
+if ($('klilLib')) $('klilLib').addEventListener('click', function (e) { var b = e.target.closest('[data-klil]'); if (b) addKlilType(b.getAttribute('data-klil')); });
 $('addType').onclick = function () { push(); var id = String.fromCharCode(65 + S.types.length); while (T(id)) id += "'"; S.types.push({ id: id, w: 1.2, h: 1.4, sill: 0.9, color: PALETTE[S.types.length % PALETTE.length] }); S.gen.pct[id] = 0; refresh(); };
 
 var lastPropsKey = '';
@@ -324,23 +364,34 @@ function refreshProps(light) {
   if (one) h += '<div class="row"><label>רוחב / גובה</label><input id="pW" type="number" step="5" value="' + Math.round(w.w * 100) + '"><input id="pH" type="number" step="5" value="' + Math.round(w.h * 100) + '"></div>' +
     '<div class="row"><label>אדן (ס״מ)</label><input id="pS" type="number" step="5" value="' + Math.round(w.sill * 100) + '"></div>' +
     '<div class="row"><label>מרחק מהקיר (ס״מ)</label><input id="pX" type="number" step="5" value="' + Math.round(w.dx * 100) + '"><button class="b" id="pC">למרכז</button></div>';
+  var kt = one && T(w.t) && T(w.t).klil && window.KlilGeom ? KlilGeom.type(T(w.t).klil) : null, kg = kt ? kgeom(w) : null;
+  if (kt) {
+    h += '<div class="row"><span class="mut">קליל באוהאוס 5600 · ' + esc(kt.name) + ' · גיליון ' + kt.sheet + '</span></div>';
+    if (kt.layout.k === 'hsplit' || kt.layout.k === 'vsplit') h += '<div class="row"><label>' + (kt.layout.k === 'hsplit' ? 'גובה הקבוע התחתון' : 'רוחב הקבוע') + ' (ס״מ)</label><input id="pSp" type="number" step="1" value="' + Math.round(kopts(w).split / 10) + '"><span class="mut">עד ציר החציץ</span></div>';
+    h += '<div class="row"><label>עובי זיגוג (מ״מ)</label><input id="pGl" type="number" min="4" max="24" step="1" value="' + kopts(w).glass + '"><label style="min-width:0"><input type="checkbox" id="pMir"' + (w.mir ? ' checked' : '') + '> היפוך ימין/שמאל</label></div>';
+    h += '<div class="mut">' + kg.sashes.map(function (sh, i) { return 'כנף ' + (i + 1) + ': ' + Math.round(sh.w / 10) + '×' + Math.round(sh.h / 10) + ' ס״מ · זכוכית ~' + Math.round(sh.kg) + ' ק״ג'; }).join('<br>') + '</div>';
+    if (kg.warn.length) h += '<div class="warn">⚠ ' + kg.warn.map(esc).join('<br>⚠ ') + '</div>';
+  }
   h += '<div class="row"><button class="b" id="pDup">שכפול</button><button class="b" id="pDel">מחיקה</button></div>' +
     '<div class="row"><label>העתק לקומות</label><input id="pFl" type="text" style="width:90px" placeholder="הכל" title="הכל, או למשל 1-5,8 (0 = קרקע)"><button class="b" id="pFlB">העתק</button></div>' +
     '<div class="row"><label>העתק למפתחים</label><input id="pBy" type="text" style="width:90px" placeholder="הכל" title="הכל, או למשל 1,3"><button class="b" id="pByB">העתק</button></div>';
-  var key = sel.map(function (x) { return x.id + ':' + x.f + ':' + x.b + ':' + x.t; }).join('|') + '#' + S.types.map(function (t) { return t.id; }).join(',');
+  var key = sel.map(function (x) { return x.id + ':' + x.f + ':' + x.b + ':' + x.t + (kt ? ':' + x.w + ':' + x.h + ':' + x.split + ':' + x.glass + ':' + x.mir : ''); }).join('|') + '#' + S.types.map(function (t) { return t.id; }).join(',');
   if (key === lastPropsKey && $('pT')) {
     // same selection: update values in place so a click on a button right after editing a field isn't swallowed
     var tmp = document.createElement('div'); tmp.innerHTML = h;
     el.firstChild.innerHTML = tmp.firstChild.innerHTML;
     tmp.querySelectorAll('input[id],select[id]').forEach(function (n) { var o = $(n.id); if (o && o !== document.activeElement && n.type !== 'text') o.value = n.tagName === 'SELECT' ? (n.querySelector('[selected]') || n.options[0]).value : n.value; });
   } else { el.innerHTML = h; lastPropsKey = key; }
-  $('pT').onchange = function () { var t = T(this.value); if (!t) return; push(); sel.forEach(function (x) { var c = x.dx + x.w / 2; x.t = t.id; x.w = t.w; x.h = t.h; x.sill = t.sill; x.dx = c - t.w / 2; delete x.gen; }); refresh(); };
+  $('pT').onchange = function () { var t = T(this.value); if (!t) return; push(); sel.forEach(function (x) { var c = x.dx + x.w / 2; x.t = t.id; x.w = t.w; x.h = t.h; x.sill = t.sill; x.dx = c - t.w / 2; delete x.gen; delete x.split; delete x.glass; }); refresh(); };
   if (one) {
     $('pW').onchange = function () { push(); var c = w.dx + w.w / 2; w.w = Math.max(0.1, +this.value / 100); w.dx = c - w.w / 2; delete w.gen; refresh(); };
     $('pH').onchange = function () { push(); w.h = Math.max(0.1, +this.value / 100); delete w.gen; refresh(); };
     $('pS').onchange = function () { push(); w.sill = +this.value / 100; delete w.gen; refresh(); };
     $('pX').onchange = function () { push(); w.dx = +this.value / 100; delete w.gen; refresh(); };
     $('pC').onclick = function () { push(); w.dx = (span(w.b) - w.w) / 2; refresh(); };
+    if ($('pSp')) $('pSp').onchange = function () { push(); w.split = +this.value * 10; refresh(); };
+    if ($('pGl')) $('pGl').onchange = function () { push(); w.glass = Math.max(4, Math.min(24, +this.value)); refresh(); };
+    if ($('pMir')) $('pMir').onchange = function () { push(); w.mir = this.checked; refresh(); };
   }
   $('pDup').onclick = duplicate; $('pDel').onclick = del;
   $('pFlB').onclick = function () { copyFloors($('pFl').value); }; $('pByB').onclick = function () { copyBays($('pBy').value); };
@@ -480,8 +531,8 @@ function buildDxf() {
   for (b = 0; b <= G.bays.length; b++) { var xb = bayL(b); line('FE_GRID_WALLS', xb, y0, xb, y1); if (G.wall > 0) { var a = b === 0 ? 0 : -G.wall / 2, e = b === G.bays.length ? 0 : G.wall / 2; if (a !== 0) line('FE_GRID_WALLS', xb + a, y0, xb + a, y1); if (e !== 0) line('FE_GRID_WALLS', xb + e, y0, xb + e, y1); } }
   for (f = 0; f <= G.floors; f++) { var lv = base(f) - G.oy; text('FE_GRID_TEXT', x0 - 0.3, base(f) + 0.05, 0.2, (lv >= 0 ? '+' : '') + lv.toFixed(2), 2); }
   for (b = 0; b < G.bays.length; b++) text('FE_GRID_TEXT', (bayL(b) + bayL(b + 1)) / 2, y0 - 0.5, 0.2, String(Math.round(G.bays[b] * 100)), 1);
-  S.win.forEach(function (w) { var t = T(w.t) || { color: '#888888' }, bn = 'FE_W_' + w.t.replace(/[^A-Za-z0-9_]/g, '_') + '_' + Math.round(w.w * 100) + 'x' + Math.round(w.h * 100), ln = 'FE_WIN_' + w.t.replace(/[^A-Za-z0-9_]/g, '_');
-    layers[ln] = aci(t.color); blocks[bn] = { w: w.w, h: w.h, t: w.t }; E(0, 'INSERT', 8, ln, 2, bn, 10, n(absX(w)), 20, n(absY(w)), 30, 0); });
+  S.win.forEach(function (w) { var t = T(w.t) || { color: '#888888' }, ko = t.klil ? kopts(w) : null, bn = 'FE_W_' + w.t.replace(/[^A-Za-z0-9_]/g, '_') + '_' + Math.round(w.w * 100) + 'x' + Math.round(w.h * 100) + (ko ? (ko.split ? '_s' + Math.round(ko.split) : '') + (ko.mir ? '_m' : '') : ''), ln = 'FE_WIN_' + w.t.replace(/[^A-Za-z0-9_]/g, '_');
+    layers[ln] = aci(t.color); blocks[bn] = { w: w.w, h: w.h, t: w.t, g: ko ? kgeom(w) : null }; E(0, 'INSERT', 8, ln, 2, bn, 10, n(absX(w)), 20, n(absY(w)), 30, 0); });
   function g(c, v) { out.push(String(c), String(v)); }
   g(0, 'SECTION'); g(2, 'HEADER'); g(9, '$ACADVER'); g(1, 'AC1009'); g(9, '$EXTMIN'); g(10, n(x0 - 1)); g(20, n(y0 - 1)); g(30, 0); g(9, '$EXTMAX'); g(10, n(x1 + 1)); g(20, n(y1 + 1)); g(30, 0); g(0, 'ENDSEC');
   g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LTYPE'); g(70, 1); g(0, 'LTYPE'); g(2, 'CONTINUOUS'); g(70, 0); g(3, 'Solid line'); g(72, 65); g(73, 0); g(40, 0); g(0, 'ENDTAB');
@@ -489,7 +540,11 @@ function buildDxf() {
   g(0, 'TABLE'); g(2, 'STYLE'); g(70, 1); g(0, 'STYLE'); g(2, 'STANDARD'); g(70, 0); g(40, 0); g(41, 1); g(50, 0); g(71, 0); g(42, 0.2 * u); g(3, 'txt'); g(4, ''); g(0, 'ENDTAB'); g(0, 'ENDSEC');
   g(0, 'SECTION'); g(2, 'BLOCKS');
   Object.keys(blocks).forEach(function (bn) { var bl = blocks[bn], fr = Math.min(0.05, bl.w / 6, bl.h / 6), save = ent; ent = [];
-    poly('0', [0, 0, bl.w, 0, bl.w, bl.h, 0, bl.h]); poly('0', [fr, fr, bl.w - fr, fr, bl.w - fr, bl.h - fr, fr, bl.h - fr]); text('0', bl.w / 2, bl.h / 2, Math.min(0.2, bl.h / 4), bl.t, 1);
+    if (bl.g) { var m = function (a) { return [a[0] / 1000, a[1] / 1000, a[2] / 1000, a[1] / 1000, a[2] / 1000, a[3] / 1000, a[0] / 1000, a[3] / 1000]; };
+      poly('0', [0, 0, bl.w, 0, bl.w, bl.h, 0, bl.h]); bl.g.bars.forEach(function (b) { poly('0', m(b)); }); bl.g.sashes.forEach(function (sh) { poly('0', m(sh.sr)); if (sh.dl[2] > sh.dl[0] && sh.dl[3] > sh.dl[1]) poly('0', m(sh.dl)); });
+      bl.g.fixed.forEach(function (fx) { if (fx.dl[2] > fx.dl[0] && fx.dl[3] > fx.dl[1]) poly('0', m(fx.dl)); });
+      bl.g.sym.forEach(function (sy) { for (var i = 0; i + 3 < sy.p.length; i += 2) line('0', sy.p[i] / 1000, sy.p[i + 1] / 1000, sy.p[i + 2] / 1000, sy.p[i + 3] / 1000); }); }
+    else { poly('0', [0, 0, bl.w, 0, bl.w, bl.h, 0, bl.h]); poly('0', [fr, fr, bl.w - fr, fr, bl.w - fr, bl.h - fr, fr, bl.h - fr]); text('0', bl.w / 2, bl.h / 2, Math.min(0.2, bl.h / 4), bl.t, 1); }
     g(0, 'BLOCK'); g(8, '0'); g(2, bn); g(70, 0); g(10, 0); g(20, 0); g(30, 0); g(3, bn); for (var i = 0; i < ent.length; i++) out.push(ent[i]); ent = save; g(0, 'ENDBLK'); g(8, '0'); });
   g(0, 'ENDSEC'); g(0, 'SECTION'); g(2, 'ENTITIES');
   return out.join('\r\n') + '\r\n' + (ent.length ? ent.join('\r\n') + '\r\n' : '') + '0\r\nENDSEC\r\n0\r\nEOF\r\n';
@@ -519,8 +574,8 @@ window.addEventListener('beforeunload', function (e) { if (S.win.length && U.len
 setInterval(function () { try { localStorage.setItem('facade-simple-autosave', JSON.stringify(projectData())); } catch (e) {} }, 5000);
 try { var as = localStorage.getItem('facade-simple-autosave'); if (as) { var d = JSON.parse(as); if (d && d.app === 'facade-editor-simple') { S.G = d.G; S.types = d.types; S.win = d.win; S.gen = Object.assign(S.gen, d.gen || {}); S.win.forEach(function (w) { var k = +String(w.id).slice(1); if (k >= nid) nid = k + 1; }); } } } catch (e) {}
 
-window.FE2 = { S: S, generate: generate, buildDxf: buildDxf, w2s: w2s, s2w: s2w, fit: fit, refresh: refresh, copyFloors: copyFloors, copyBays: copyBays, projectData: projectData, loadProject: loadProject, base: base, bayL: bayL, absX: absX, absY: absY, undo: undo };
+window.FE2 = { kgeom: kgeom, addKlilType: addKlilType, S: S, generate: generate, buildDxf: buildDxf, w2s: w2s, s2w: s2w, fit: fit, refresh: refresh, copyFloors: copyFloors, copyBays: copyBays, projectData: projectData, loadProject: loadProject, base: base, bayL: bayL, absX: absX, absY: absY, undo: undo };
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(function () {});
 if ('launchQueue' in window) window.launchQueue.setConsumer(function (lp) { if (lp.files && lp.files.length) lp.files[0].getFile().then(function (f) { if (/\.json$/i.test(f.name)) { f.text().then(function (t) { loadProject(JSON.parse(t)); }); } else { $('bgBox').open = true; loadBg(f); } }); });
-resize(); refresh(); fit();
+renderKlilLib(); resize(); refresh(); fit();
 })();

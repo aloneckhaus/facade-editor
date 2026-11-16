@@ -47,6 +47,13 @@ details summary{cursor:pointer;padding:12px 14px;font-weight:700;color:var(--mut
 details[open] summary{color:var(--ink)}
 #toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#2c2a27;color:#fff;padding:8px 16px;border-radius:6px;display:none;z-index:9}
 .res{font-size:12px;color:var(--mut);margin-top:4px}
+#klilBox summary{padding:8px 0}
+#klilLib{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}
+.kl{display:flex;align-items:center;gap:6px;text-align:right;font:inherit;font-size:12px;line-height:1.25;padding:4px;border:1px solid #d8d2c7;border-radius:6px;background:#fff;cursor:pointer}
+.kl:hover{background:#f3f6f9;border-color:#9fb3c8}
+.kl canvas{flex:none;width:44px;height:56px}
+.kn{font-size:11px;max-width:120px;line-height:1.2}
+.warn{color:#c4500a;font-size:12px;margin:4px 0}
 </style>
 </head>
 <body>
@@ -79,6 +86,10 @@ details[open] summary{color:var(--ink)}
     <div class="mut">לחיצה על סוג ואז לחיצה בתא בגריד מוסיפה חלון. מידות בס״מ.</div>
     <table id="types"></table>
     <div class="row"><button class="b" id="addType">+ סוג חלון</button></div>
+    <details id="klilBox" open><summary>ספריית קליל באוהאוס 5600</summary>
+      <div class="mut">לחיצה על דגם מוסיפה אותו לסוגים ומפעילה הצבה. קווי מראה, חלוקות וסימוני פתיחה לפי פרטי קליל; אזהרה כשכנף חורגת ממידות/משקל מקסימליים.</div>
+      <div id="klilLib"></div>
+    </details>
   </div>
 
   <h3>3 · חלון נבחר</h3>
@@ -120,6 +131,8 @@ details[open] summary{color:var(--ink)}
 <div id="toast"></div>
 <script src="lib/dxf-parser.js"></script>
 <script src="geom.js"></script>
+<script src="klil5600.js"></script>
+<script src="klilgeom.js"></script>
 <script src="simple.js"></script>
 </body>
 </html>
