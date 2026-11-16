@@ -1,0 +1,2 @@
+libredwg-web (@mlightcad/libredwg-web 0.9.0) – GPL-3.0 – https://github.com/mlightcad/libredwg-web (based on GNU LibreDWG)
+dxf-parser – MIT – https://github.com/gdsestimating/dxf-parser

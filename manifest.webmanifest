@@ -1,0 +1,19 @@
+{
+  "name": "עורך חזיתות",
+  "short_name": "חזיתות",
+  "description": "עורך חזיתות: DWG/DXF ברקע, חלונות, מרפסות וחיפויים מעליו",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f2ee",
+  "theme_color": "#2c2a27",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "file_handlers": [
+    { "action": "./index.html", "accept": { "application/acad": [".dwg"], "image/vnd.dxf": [".dxf"], "application/json": [".json"] } }
+  ]
+}

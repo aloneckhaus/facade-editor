@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>עורך חזיתות – אב טיפוס</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2c2a27">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root{--bg:#f4f2ee;--panel:#fff;--line:#ddd8cf;--ink:#2b2b2b;--mut:#7a746a;--acc:#e8960c;--acc2:#2f6fd6}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:"Heebo","Rubik","IBM Plex Sans Hebrew","Segoe UI",Arial,sans-serif;font-size:13px;color:var(--ink);background:var(--bg)}
+#app{display:flex;flex-direction:column;height:100%}
+#toolbar{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#2c2a27;color:#eee;flex-wrap:wrap}
+#toolbar .brand{font-weight:700;color:var(--acc);margin-left:10px;font-size:15px}
+#toolbar button,#toolbar label.tb{background:#3c3935;color:#eee;border:1px solid #55504a;border-radius:5px;padding:5px 9px;cursor:pointer;font:inherit;display:inline-flex;align-items:center;gap:4px}
+#toolbar button:hover{background:#4a4640}
+#toolbar button.on{background:var(--acc);border-color:var(--acc);color:#1d1b18;font-weight:600}
+#toolbar .sep{width:1px;height:22px;background:#55504a;margin:0 4px}
+#toolbar select,#toolbar input[type=number]{background:#3c3935;color:#eee;border:1px solid #55504a;border-radius:4px;padding:3px;font:inherit}
+#toolbar input[type=number]{width:54px}
+#main{flex:1;display:flex;min-height:0}
+#side{width:370px;min-width:300px;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto}
+#stage{flex:1;position:relative;min-width:0;direction:ltr;background:#fbfaf7}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair;outline:none}
+#status{position:absolute;left:0;right:0;bottom:0;height:24px;background:rgba(44,42,39,.85);color:#ddd;font-size:12px;display:flex;gap:16px;align-items:center;padding:0 10px;direction:rtl;pointer-events:none}
+#drop{position:absolute;inset:20px;border:3px dashed var(--acc);border-radius:12px;display:none;align-items:center;justify-content:center;font-size:22px;color:var(--acc);background:rgba(255,255,255,.8);direction:rtl;pointer-events:none}
+#empty{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);text-align:center;color:var(--mut);direction:rtl;pointer-events:none;line-height:1.8}
+#empty b{color:var(--ink);font-size:18px}
+details{border-bottom:1px solid var(--line)}
+summary{padding:9px 12px;font-weight:700;cursor:pointer;background:#faf8f4;user-select:none}
+summary:hover{background:#f3efe7}
+.sec{padding:8px 12px 12px}
+.row{display:flex;align-items:center;gap:6px;margin:4px 0;flex-wrap:wrap}
+.row label{min-width:86px;color:var(--mut)}
+input[type=number],input[type=text],select{font:inherit;padding:3px 5px;border:1px solid var(--line);border-radius:4px;background:#fff}
+input[type=number]{width:72px;direction:ltr;text-align:right}
+input[type=color]{width:30px;height:24px;border:1px solid var(--line);padding:0;background:none}
+button.b{font:inherit;padding:4px 9px;border:1px solid #cfc8bc;background:#f7f4ee;border-radius:5px;cursor:pointer}
+button.b:hover{background:#efe9de}
+button.p{background:var(--acc);border-color:#c97f06;color:#1d1b18;font-weight:600}
+button.p:hover{background:#f2a51f}
+button.x{border:none;background:none;color:#b33;cursor:pointer;font-size:15px;padding:0 4px}
+table.t{width:100%;border-collapse:collapse;font-size:12px}
+table.t th,table.t td{border-bottom:1px solid #eee;padding:3px 3px;text-align:right}
+table.t th{color:var(--mut);font-weight:600}
+table.t input[type=number]{width:52px}
+table.t input[type=text]{width:72px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:middle;border:1px solid rgba(0,0,0,.2)}
+.lay{max-height:220px;overflow:auto;border:1px solid #eee;border-radius:4px;padding:4px}
+.lay label{display:flex;gap:6px;align-items:center;padding:1px 2px;direction:ltr;justify-content:flex-end}
+.mut{color:var(--mut);font-size:12px}
+.typebtn{display:inline-flex;align-items:center;gap:4px;margin:2px;padding:3px 7px;border:1px solid #cfc8bc;border-radius:12px;cursor:pointer;background:#fff;font:inherit}
+.typebtn.on{outline:2px solid var(--acc2)}
+.msg{padding:6px 8px;background:#fff6e0;border:1px solid #f0d58c;border-radius:5px;margin:6px 0;font-size:12px}
+.err{background:#fde8e8;border-color:#f0a0a0}
+.kbd{font-family:monospace;background:#eee;border-radius:3px;padding:0 4px;direction:ltr;display:inline-block}
+#toast{position:fixed;bottom:36px;left:50%;transform:translateX(-50%);background:#2c2a27;color:#fff;padding:8px 16px;border-radius:6px;display:none;z-index:9;direction:rtl}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar">
+    <span class="brand">עורך חזיתות</span>
+    <label class="tb" title="פתיחת DWG / DXF / פרויקט JSON">📂 פתיחה<input id="fileIn" type="file" accept=".dwg,.dxf,.json" hidden></label>
+    <span class="sep"></span>
+    <button data-tool="select" title="בחירה והזזה (V)">⬚ בחירה</button>
+    <button data-tool="window" title="הצבת חלון (W)">▭ חלון</button>
+    <button data-tool="balcony" title="ציור מרפסת – גרירה (B)">▬ מרפסת</button>
+    <button data-tool="cladding" title="ציור אזור חיפוי – גרירה (C)">▦ חיפוי</button>
+    <button data-tool="zone" title="אזור לפריסה דינמית – גרירה (G)">⚄ אזור פריסה</button>
+    <button data-tool="level" title="הוספת קו מפלס בלחיצה (L)">═ מפלס</button>
+    <button data-tool="pan" title="הזזת תצוגה (H) – אפשר גם גלגלת/כפתור אמצעי">✋</button>
+    <span class="sep"></span>
+    <button id="fitBtn" title="התאמה לתצוגה (F)">⤢ התאם</button>
+    <button id="undoBtn" title="ביטול (Ctrl+Z)">↶</button>
+    <button id="redoBtn" title="חזרה (Ctrl+Y)">↷</button>
+    <span class="sep"></span>
+    <span>הצמדה:</span>
+    <button id="snEnd" class="on" title="הצמדה לנקודות קצה בשרטוט">נקודות</button>
+    <button id="snLine" class="on" title="הצמדה לקווים בשרטוט">קווים</button>
+    <button id="snLev" class="on" title="הצמדה למפלסים ולאלמנטים">מפלסים</button>
+    <button id="snGrid" class="on" title="הצמדה לגריד">גריד</button>
+    <input id="gridSize" type="number" value="5" min="1" step="1" title="גודל גריד (ס״מ)"><span class="mut" style="color:#bbb">ס״מ</span>
+  </div>
+  <div id="main">
+    <aside id="side">
+      <details open><summary>קובץ ורקע</summary><div class="sec">
+        <div class="row"><button class="b p" id="openBtn">פתיחת DWG / DXF…</button><span class="mut">או גרירה לקנבס</span></div>
+        <div id="fileInfo" class="mut"></div>
+        <div class="row"><label>יחידות שרטוט</label><select id="unitSel"><option value="auto">אוטומטי</option><option value="0.001">מ״מ</option><option value="0.01">ס״מ</option><option value="1">מטר</option><option value="0.0254">אינץ׳</option></select></div>
+        <div class="row"><label>שקיפות רקע</label><input id="bgOp" type="range" min="0.05" max="1" step="0.05" value="0.35" style="flex:1"></div>
+        <div class="row"><label><input type="checkbox" id="bgText" checked> טקסטים</label><label><input type="checkbox" id="bgColor"> צבעי שכבות</label></div>
+        <div class="row"><span class="mut">שכבות:</span><button class="b" id="layAll">הכל</button><button class="b" id="layNone">כלום</button></div>
+        <div class="lay" id="layers"><span class="mut">אין שרטוט טעון</span></div>
+      </div></details>
+
+      <details open><summary>ספריית אלמנטים</summary><div class="sec">
+        <div class="mut">לחיצה על סוג = כלי הצבה. מידות בס״מ, אדן = גובה מעל המפלס.</div>
+        <table class="t" id="typesTbl"></table>
+        <div class="row"><button class="b" id="addWin">+ סוג חלון</button><button class="b" id="addBal">+ סוג מרפסת</button></div>
+        <div style="margin-top:8px;font-weight:600">חומרי חיפוי</div>
+        <table class="t" id="matTbl"></table>
+        <div class="row"><button class="b" id="addMat">+ חומר</button></div>
+      </div></details>
+
+      <details open><summary>מאפיינים</summary><div class="sec" id="props"><span class="mut">לא נבחר אלמנט</span></div></details>
+
+      <details><summary>מפלסים וקומות</summary><div class="sec">
+        <div class="row"><button class="b" id="levDetect">זיהוי מפלסים מהשרטוט</button><button class="b" id="levClear">מחיקת כולם</button></div>
+        <div class="row"><label>מפלס בסיס (מ׳)</label><input id="levBase" type="number" step="0.01" value="0"></div>
+        <div class="row"><label>גובה קומה (מ׳)</label><input id="levH" type="number" step="0.01" value="3.2"></div>
+        <div class="row"><label>מספר קומות</label><input id="levN" type="number" step="1" value="6"><button class="b" id="levGen">יצירה</button></div>
+        <table class="t" id="levTbl"></table>
+        <div style="margin-top:8px;font-weight:600">שכפול הבחירה לקומות</div>
+        <div class="row"><label>מקומה</label><input id="repFrom" type="number" value="1" step="1"><label style="min-width:auto">עד</label><input id="repTo" type="number" value="99" step="1"></div>
+        <div class="row"><button class="b p" id="repBtn">שכפל לכל הקומות</button></div>
+      </div></details>
+
+      <details><summary>מערך (Array) לאורך מפתח</summary><div class="sec">
+        <div class="row"><label>כמות (כולל המקור)</label><input id="arrN" type="number" value="4" min="2" step="1"></div>
+        <div class="row"><label>מרווח צירים (ס״מ)</label><input id="arrD" type="number" value="300" step="1"></div>
+        <div class="row"><label>כיוון</label><select id="arrDir"><option value="r">ימינה →</option><option value="l">← שמאלה</option><option value="u">למעלה ↑</option><option value="d">למטה ↓</option></select></div>
+        <div class="row"><label>או: חלוקה עד X (ס״מ)</label><input id="arrTo" type="number" placeholder="ריק" step="1"></div>
+        <div class="row"><button class="b p" id="arrBtn">צור מערך מהבחירה</button></div>
+      </div></details>
+
+      <details open><summary>פריסה דינמית</summary><div class="sec">
+        <div class="row"><span id="zoneInfo" class="mut">אין אזור. צייר עם "אזור פריסה" או בחר אזור חיפוי.</span></div>
+        <div class="row"><button class="b" id="zoneFromSel">אזור מהבחירה</button><button class="b" id="zoneFromBg">אזור = כל השרטוט</button></div>
+        <div class="row"><label>שיטה</label><select id="genMode"><option value="columns">עמודות קבועות</option><option value="random">אקראי חופשי</option></select></div>
+        <div class="row"><label>עמודות</label><input id="genCols" type="number" value="10" min="1" step="1"></div>
+        <div class="row"><label>% ריקים</label><input id="genEmpty" type="number" value="0" min="0" max="90" step="1"></div>
+        <div class="row"><label>מרווח מינ׳ (ס״מ)</label><input id="genGap" type="number" value="60" step="5"></div>
+        <div class="row"><label>שוליים (ס״מ)</label><input id="genMargin" type="number" value="50" step="5"></div>
+        <div class="row"><label>מרווח עליון (ס״מ)</label><input id="genTop" type="number" value="30" step="5" title="מרחק מינימלי מראש החלון לתקרה/מפלס הבא"></div>
+        <div class="row"><label>כמות מקס׳</label><input id="genMax" type="number" value="0" min="0" step="1"><span class="mut">0 = ללא הגבלה</span></div>
+        <div class="row"><label>הימנעות</label><label style="min-width:auto"><input type="checkbox" id="genAvoid" checked> מאלמנטים קיימים</label></div>
+        <div style="font-weight:600;margin-top:6px">תמהיל (%)</div>
+        <table class="t" id="mixTbl"></table>
+        <div class="row"><label>Seed</label><input id="genSeed" type="number" value="1" step="1"><button class="b" id="reseed">🎲 הגרלה מחדש</button></div>
+        <div class="row"><button class="b p" id="genBtn">צור פריסה</button><button class="b" id="genClear">מחק פריסה</button><button class="b" id="genFreeze" title="הפוך את החלונות שנוצרו לרגילים">קבע</button></div>
+        <div id="genRes" class="mut"></div>
+      </div></details>
+
+      <details open><summary>כמויות</summary><div class="sec" id="qty"></div></details>
+
+      <details open><summary>ייצוא ושמירה</summary><div class="sec">
+        <div class="row"><label><input type="checkbox" id="expMerge" checked> כולל השרטוט המקורי</label></div>
+        <div class="row"><label><input type="checkbox" id="expJoints" checked> קווי חלוקת חיפוי</label><label><input type="checkbox" id="expLevels" checked> מפלסים</label></div>
+        <div class="row"><button class="b p" id="expDxf">DXF</button><button class="b" id="expPng">PNG</button><button class="b" id="expSvg">SVG</button><button class="b" id="saveJson">שמירת פרויקט</button></div>
+        <div class="mut">ה-DXF נשמר ביחידות השרטוט המקורי, כל סוג אלמנט בשכבה משלו (FE_WIN_A …) וחלונות כבלוקים.</div>
+      </div></details>
+
+      <details><summary>קיצורים</summary><div class="sec mut" style="line-height:1.9">
+        <span class="kbd">V</span> בחירה · <span class="kbd">W</span> חלון · <span class="kbd">B</span> מרפסת · <span class="kbd">C</span> חיפוי · <span class="kbd">G</span> אזור · <span class="kbd">L</span> מפלס · <span class="kbd">F</span> התאמה<br>
+        <span class="kbd">Del</span> מחיקה · <span class="kbd">Ctrl+D</span> שכפול · <span class="kbd">Ctrl+Z/Y</span> ביטול/חזרה · <span class="kbd">חיצים</span> הזזה 1 ס״מ (Shift = 10)<br>
+        גלגלת = זום · כפתור אמצעי / ימני / רווח+גרירה = הזזת תצוגה · Shift+לחיצה = הוספה לבחירה · Alt = ביטול הצמדה
+      </div></details>
+    </aside>
+    <div id="stage">
+      <canvas id="cv" tabindex="0"></canvas>
+      <div id="empty"><b>עורך חזיתות</b><br>פתח קובץ DWG או DXF של חזית או תכנית<br>(או גרור אותו לכאן) – הקווים יוצגו ברקע,<br>ועליהם אפשר למקם חלונות, מרפסות וחיפויים.</div>
+      <div id="drop">שחרר כאן קובץ DWG / DXF / JSON</div>
+      <div id="status"><span id="stXY">X: – Y: –</span><span id="stZoom"></span><span id="stSnap"></span><span id="stTool"></span><span id="stSel"></span></div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<script src="lib/dxf-parser.js"></script>
+<script src="geom.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
