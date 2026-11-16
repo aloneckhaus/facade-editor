@@ -1,4 +1,4 @@
-/* Facade editor v0.3 – simple: floor/wall grid + windows only (+ Klil Bauhaus 5600 library). World units = metres, y up. */
+/* Facade editor v0.4 – simple: floor/wall grid + windows only (+ Klil Bauhaus 5600 library). World units = metres, y up. */
 (function () {
 'use strict';
 var $ = function (id) { return document.getElementById(id); };
@@ -341,12 +341,16 @@ function renderKlilLib() {
     var g = KlilGeom.geom(kt.id, d.w, d.h, {}), sc = Math.min(40 / d.w, 52 / d.h) * 1000, x = (44 - d.w * sc / 1000) / 2, y = (56 - d.h * sc / 1000) / 2;
     drawKlil(c2, { t: '' }, g, x, y, sc, 0.5, false, '#000'); });
 }
-function addKlilType(kid) {
-  var kt = KlilGeom.type(kid); if (!kt) return; var t = null;
+function ensureKlilType(kid, noPush) {
+  var kt = KlilGeom.type(kid); if (!kt) return null; var t = null;
   S.types.forEach(function (o) { if (o.klil === kid) t = o; });
-  if (!t) { push(); var id = kt.id; while (T(id)) id += "'"; var d = kt.defaults;
+  if (!t) { if (!noPush) push(); var id = kt.id; while (T(id)) id += "'"; var d = kt.defaults;
     t = { id: id, name: kt.name, klil: kid, w: d.w / 1000, h: d.h / 1000, sill: d.sill / 1000, color: '#3d4a57', glass: kt.glass };
     if (d.split) t.split = d.split; S.types.push(t); S.gen.pct[id] = 0; }
+  return t;
+}
+function addKlilType(kid) {
+  var kt = KlilGeom.type(kid), t = ensureKlilType(kid); if (!t) return;
   S.place = t.id; refresh(); toast('לחץ בתא בגריד כדי להוסיף ' + t.id + ' – ' + kt.name + ' · Esc לסיום');
 }
 if ($('klilLib')) $('klilLib').addEventListener('click', function (e) { var b = e.target.closest('[data-klil]'); if (b) addKlilType(b.getAttribute('data-klil')); });
@@ -404,21 +408,47 @@ function scopeCells() {
   else for (var f = 0; f < S.G.floors; f++) for (var b = 0; b < S.G.bays.length; b++) out.push({ f: f, b: b });
   return out.filter(function (c) { return c.f < S.G.floors && c.b < S.G.bays.length; }).sort(function (a, b) { return a.f - b.f || a.b - b.b; });
 }
+// which types the dynamic layout may use: S.gen.use[id] (old projects: derived from % > 0)
+function genUse() { var g = S.gen; if (!g.use) { g.use = {}; S.types.forEach(function (t) { if ((g.pct[t.id] || 0) > 0) g.use[t.id] = true; }); } return g.use; }
+function isDoorT(t) { var kt = t && t.klil && window.KlilGeom ? KlilGeom.type(t.klil) : null; return !!(kt && kt.kind === 'door'); }
+function typeWarn(t) { return t.klil && window.KlilGeom ? KlilGeom.geom(t.klil, t.w * 1000, t.h * 1000, { split: t.split, glass: t.glass }).warn : []; }
+function thumb(cv2, t, kid) { var c2 = cv2.getContext('2d'), Wc = cv2.width, Hc = cv2.height; c2.clearRect(0, 0, Wc, Hc);
+  var w = t ? t.w * 1000 : KlilGeom.type(kid).defaults.w, h = t ? t.h * 1000 : KlilGeom.type(kid).defaults.h, sc = Math.min((Wc - 4) / w, (Hc - 4) / h) * 1000, x = (Wc - w * sc / 1000) / 2, y = (Hc - h * sc / 1000) / 2;
+  kid = kid || (t && t.klil);
+  if (kid && window.KlilGeom) { var o = t ? { split: t.split, glass: t.glass } : {}; drawKlil(c2, { t: '' }, KlilGeom.geom(kid, w, h, o), x, y, sc, 0.5, false, '#000'); }
+  else { c2.fillStyle = hexA(t.color, 0.25); c2.fillRect(x, y, w * sc / 1000, h * sc / 1000); c2.strokeStyle = t.color; c2.lineWidth = 1.5; c2.strokeRect(x, y, w * sc / 1000, h * sc / 1000); } }
+var lastMixHtml = '';
 function renderMix() {
-  var cnt = {}, tot = 0; S.win.forEach(function (w) { cnt[w.t] = (cnt[w.t] || 0) + 1; tot++; });
-  $('mix').innerHTML = '<tr><th>סוג</th><th>% יעד</th><th>בפועל</th></tr>' + S.types.map(function (t) {
-    return '<tr><td><span class="sw" style="background:' + t.color + '"></span> ' + esc(t.id) + ' <span class="mut">' + Math.round(t.w * 100) + '×' + Math.round(t.h * 100) + '</span></td><td><input type="number" min="0" step="5" data-pct="' + esc(t.id) + '" value="' + (S.gen.pct[t.id] || 0) + '"></td><td class="mut">' + (tot ? (cnt[t.id] || 0) + ' (' + Math.round(100 * (cnt[t.id] || 0) / tot) + '%)' : '–') + '</td></tr>'; }).join('');
+  var cnt = {}, tot = 0, use = genUse(); S.win.forEach(function (w) { cnt[w.t] = (cnt[w.t] || 0) + 1; tot++; });
+  var rows = S.types.map(function (t) { return { t: t, id: t.id }; });
+  if (window.KlilGeom) KlilGeom.data.types.forEach(function (kt) { if (!S.types.some(function (t) { return t.klil === kt.id; })) rows.push({ lib: kt, id: 'lib:' + kt.id }); });
+  var h = '<tr><th></th><th></th><th>סוג</th><th>משקל %</th><th>בפועל</th></tr>' + rows.map(function (r) {
+    var t = r.t, on = t && use[t.id], nm = t ? (t.name || '') : r.lib.name, w = t ? t.w : r.lib.defaults.w / 1000, hh = t ? t.h : r.lib.defaults.h / 1000, wn = t ? typeWarn(t) : [];
+    return '<tr class="' + (on ? 'on' : '') + '"><td><input type="checkbox" data-use="' + esc(r.id) + '"' + (on ? ' checked' : '') + '></td><td><canvas class="th" width="26" height="34" data-th="' + esc(r.id) + '"></canvas></td>' +
+      '<td title="' + esc(nm) + '"><b>' + esc(t ? t.id : r.lib.id) + '</b> <span class="mut">' + Math.round(w * 100) + '×' + Math.round(hh * 100) + (t ? '' : ' · ספריית קליל') + '</span>' + (nm ? '<div class="mut kn">' + esc(nm) + '</div>' : '') + (wn.length ? '<div class="warn" title="' + esc(wn.join(' | ')) + '">⚠ חורג ממידות קליל – לא ייכלל</div>' : '') + '</td>' +
+      '<td>' + (t ? '<input type="number" min="0" step="5" data-pct="' + esc(t.id) + '" value="' + (S.gen.pct[t.id] || 0) + '">' : '') + '</td><td class="mut">' + (t && tot ? (cnt[t.id] || 0) + ' (' + Math.round(100 * (cnt[t.id] || 0) / tot) + '%)' : '–') + '</td></tr>'; }).join('');
+  if (h !== lastMixHtml) { lastMixHtml = h; $('mix').innerHTML = h;
+    $('mix').querySelectorAll('[data-th]').forEach(function (cv2) { var id = cv2.getAttribute('data-th'); if (id.indexOf('lib:') === 0) thumb(cv2, null, id.slice(4)); else thumb(cv2, T(id)); }); }
+  $('genDoorsG').checked = S.gen.doorsGround !== false;
   var g = S.gen, a = document.activeElement;
   [['genGap', g.gap * 100], ['genMargin', g.margin * 100], ['genTop', g.top * 100], ['genPer', g.per], ['genEmpty', g.empty], ['genMax', g.max]].forEach(function (p) { if (a !== $(p[0])) $(p[0]).value = Math.round(p[1]); });
   $('genSame').checked = g.same;
   $('genScope').textContent = S.cells.size ? 'הפריסה תחול על ' + S.cells.size + ' תאים נבחרים (Esc לביטול הבחירה)' : 'הפריסה תחול על כל הגריד. לבחירת תאים: גרור על שטח ריק.';
 }
-$('mix').addEventListener('change', function (e) { var id = e.target.getAttribute('data-pct'); if (id) S.gen.pct[id] = Math.max(0, +e.target.value); });
+$('mix').addEventListener('change', function (e) { var id = e.target.getAttribute('data-pct'); if (id) { S.gen.pct[id] = Math.max(0, +e.target.value); if (S.gen.pct[id] > 0) genUse()[id] = true; renderMix(); return; }
+  var u = e.target.getAttribute('data-use'); if (!u) return; var use = genUse();
+  if (u.indexOf('lib:') === 0) { var t = ensureKlilType(u.slice(4)); u = t.id; }
+  use[u] = e.target.checked; if (e.target.checked && !(S.gen.pct[u] > 0)) S.gen.pct[u] = 20;
+  refresh(); });
+$('genAll').onclick = function () { var use = genUse(); S.types.forEach(function (t) { use[t.id] = true; if (!(S.gen.pct[t.id] > 0)) S.gen.pct[t.id] = 20; }); refresh(); };
+$('genNone').onclick = function () { S.gen.use = {}; refresh(); };
+$('genDoorsG').onchange = function () { S.gen.doorsGround = this.checked; };
 function readGen() { var g = S.gen; g.gap = +$('genGap').value / 100; g.margin = +$('genMargin').value / 100; g.top = +$('genTop').value / 100; g.per = Math.max(1, +$('genPer').value | 0); g.empty = Math.max(0, Math.min(95, +$('genEmpty').value)); g.max = Math.max(0, +$('genMax').value | 0); g.same = $('genSame').checked; }
 ['genGap', 'genMargin', 'genTop', 'genPer', 'genEmpty', 'genMax', 'genSame'].forEach(function (id) { $(id).addEventListener('change', readGen); });
 function generate() {
-  readGen(); var g = S.gen, Rn = rng(g.seed), types = S.types.filter(function (t) { return (g.pct[t.id] || 0) > 0; });
-  if (!types.length) { toast('הגדר אחוזים לסוגי החלונות'); return null; }
+  readGen(); var g = S.gen, Rn = rng(g.seed), use = genUse(), excl = [], doorsG = g.doorsGround !== false;
+  var types = S.types.filter(function (t) { if (!use[t.id] || !((g.pct[t.id] || 0) > 0)) return false; if (typeWarn(t).length) { excl.push(t.id); return false; } return true; });
+  if (!types.length) { toast(excl.length ? 'הסוגים שנבחרו חורגים ממידות קליל' : 'סמן סוגי חלונות לפריסה'); return null; }
   var sumP = types.reduce(function (a, t) { return a + g.pct[t.id]; }, 0), cells = scopeCells(), inScope = {};
   cells.forEach(function (c) { inScope[ck(c.f, c.b)] = 1; });
   push();
@@ -428,7 +458,7 @@ function generate() {
     var s = ws.reduce(function (a, b) { return a + b; }, 0), r = Rn() * s; for (var i = 0; i < el.length; i++) { r -= ws[i]; if (r <= 0) return el[i]; } return el[el.length - 1]; }
   function makePattern(c) {
     var sp = span(c.b), avail = sp - 2 * g.margin, maxH = fh(c.f) - g.top;
-    var el = types.filter(function (t) { return t.w <= avail + 1e-6 && t.sill + t.h <= maxH + 1e-6; });
+    var el = types.filter(function (t) { return t.w <= avail + 1e-6 && t.sill + t.h <= maxH + 1e-6 && !(doorsG && c.f !== 0 && isDoorT(t)); });
     if (!el.length) { skipped++; return []; }
     if (Rn() * 100 < g.empty) return [];
     var k = 1 + Math.floor(Rn() * g.per), chosen = [], used = 0;
@@ -441,8 +471,9 @@ function generate() {
   for (var i = 0; i < cells.length; i++) {
     var c = cells[i]; if (g.max && total >= g.max) break;
     var pat;
-    if (g.same && patterns[c.b]) { pat = patterns[c.b].filter(function (p) { return p.sill + p.h <= fh(c.f) - g.top + 1e-6; }); pat.forEach(function (p) { count[p.t]++; total++; }); }
-    else { pat = makePattern(c); if (g.same) patterns[c.b] = pat; }
+    var pk = c.b + (doorsG && c.f === 0 ? 'g' : ''); // ground floor gets its own pattern when doors are ground-only
+    if (g.same && patterns[pk]) { pat = patterns[pk].filter(function (p) { return p.sill + p.h <= fh(c.f) - g.top + 1e-6; }); pat.forEach(function (p) { count[p.t]++; total++; }); }
+    else { pat = makePattern(c); if (g.same) patterns[pk] = pat; }
     var manual = S.win.filter(function (w) { return w.f === c.f && w.b === c.b; });
     pat.forEach(function (p) {
       if (manual.some(function (m) { return p.dx < m.dx + m.w + g.gap && p.dx + p.w + g.gap > m.dx; })) { count[p.t]--; total--; return; }
@@ -450,7 +481,7 @@ function generate() {
     });
   }
   S.sel.clear(); refresh();
-  $('genRes').innerHTML = 'נוצרו ' + total + ' חלונות ב-' + cells.length + ' תאים' + (skipped ? ' · ב-' + skipped + ' תאים אף סוג לא נכנס' : '') + '<br>' +
+  $('genRes').innerHTML = 'נוצרו ' + total + ' חלונות ב-' + cells.length + ' תאים' + (skipped ? ' · ב-' + skipped + ' תאים אף סוג לא נכנס' : '') + (excl.length ? ' · לא נכללו (חורגים ממידות קליל): ' + excl.join(', ') : '') + '<br>' +
     types.map(function (t) { return t.id + ': ' + count[t.id] + ' (' + (total ? Math.round(100 * count[t.id] / total) : 0) + '%, יעד ' + Math.round(100 * g.pct[t.id] / sumP) + '%)'; }).join(' · ');
   return { total: total, count: count, cells: cells.length };
 }
@@ -560,7 +591,7 @@ function projectData() { return { app: 'facade-editor-simple', version: 2, G: S.
 function saveProject() { download(baseName() + '.facade.json', JSON.stringify(projectData(), null, 1), 'application/json'); }
 function loadProject(d) {
   if (d.app !== 'facade-editor-simple') throw new Error('קובץ פרויקט לא מתאים לגרסה הזו');
-  push(); S.G = d.G; S.types = d.types; S.win = d.win; S.gen = Object.assign(S.gen, d.gen || {}); S.sel.clear(); S.cells.clear();
+  push(); S.G = d.G; S.types = d.types; S.win = d.win; S.gen = Object.assign(S.gen, d.gen || {}); if (!(d.gen && d.gen.use)) delete S.gen.use; S.sel.clear(); S.cells.clear();
   nid = 1; S.win.forEach(function (w) { var k = +String(w.id).slice(1); if (k >= nid) nid = k + 1; }); refresh(); fit();
 }
 $('saveP').onclick = saveProject;
@@ -574,7 +605,7 @@ window.addEventListener('beforeunload', function (e) { if (S.win.length && U.len
 setInterval(function () { try { localStorage.setItem('facade-simple-autosave', JSON.stringify(projectData())); } catch (e) {} }, 5000);
 try { var as = localStorage.getItem('facade-simple-autosave'); if (as) { var d = JSON.parse(as); if (d && d.app === 'facade-editor-simple') { S.G = d.G; S.types = d.types; S.win = d.win; S.gen = Object.assign(S.gen, d.gen || {}); S.win.forEach(function (w) { var k = +String(w.id).slice(1); if (k >= nid) nid = k + 1; }); } } } catch (e) {}
 
-window.FE2 = { kgeom: kgeom, addKlilType: addKlilType, S: S, generate: generate, buildDxf: buildDxf, w2s: w2s, s2w: s2w, fit: fit, refresh: refresh, copyFloors: copyFloors, copyBays: copyBays, projectData: projectData, loadProject: loadProject, base: base, bayL: bayL, absX: absX, absY: absY, undo: undo };
+window.FE2 = { genUse: genUse, kgeom: kgeom, addKlilType: addKlilType, S: S, generate: generate, buildDxf: buildDxf, w2s: w2s, s2w: s2w, fit: fit, refresh: refresh, copyFloors: copyFloors, copyBays: copyBays, projectData: projectData, loadProject: loadProject, base: base, bayL: bayL, absX: absX, absY: absY, undo: undo };
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(function () {});
 if ('launchQueue' in window) window.launchQueue.setConsumer(function (lp) { if (lp.files && lp.files.length) lp.files[0].getFile().then(function (f) { if (/\.json$/i.test(f.name)) { f.text().then(function (t) { loadProject(JSON.parse(t)); }); } else { $('bgBox').open = true; loadBg(f); } }); });
 renderKlilLib(); resize(); refresh(); fit();

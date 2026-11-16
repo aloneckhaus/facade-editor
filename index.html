@@ -54,6 +54,10 @@ details[open] summary{color:var(--ink)}
 .kl canvas{flex:none;width:44px;height:56px}
 .kn{font-size:11px;max-width:120px;line-height:1.2}
 .warn{color:#c4500a;font-size:12px;margin:4px 0}
+#mixWrap{max-height:340px;overflow-y:auto;border:1px solid #f0ece5;border-radius:6px;margin:4px 0}
+#mix canvas.th{width:26px;height:34px;display:block}
+#mix tr.on td{background:#f3f8ff}
+#mix .warn{font-size:11px;margin:1px 0}
 </style>
 </head>
 <body>
@@ -98,7 +102,9 @@ details[open] summary{color:var(--ink)}
   <h3>4 · פריסה דינמית</h3>
   <div class="box">
     <div class="mut" id="genScope"></div>
-    <table id="mix"></table>
+    <div class="mut">סמן אילו חלונות ייכנסו לפריסה (גם מספריית קליל). המשקל קובע כמה מכל סוג.</div>
+    <div class="row"><button class="b" id="genAll">סמן הכל</button><button class="b" id="genNone">נקה סימון</button><label style="min-width:0"><input type="checkbox" id="genDoorsG" checked> דלתות רק בקומת קרקע</label></div>
+    <div id="mixWrap"><table id="mix"></table></div>
     <div class="row"><label>מרווח בין חלונות</label><input id="genGap" type="number" step="5"> <span class="mut">ס״מ</span></div>
     <div class="row"><label>מרחק מקירות</label><input id="genMargin" type="number" step="5"> <span class="mut">ס״מ</span></div>
     <div class="row"><label>מרחק מהתקרה</label><input id="genTop" type="number" step="5"> <span class="mut">ס״מ</span></div>
